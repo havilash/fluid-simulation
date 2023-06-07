@@ -30,7 +30,7 @@ impl Renderer {
 
         for particle in context.particles.iter() {
             self.draw_circle(
-                particle.position.as_tuple(),
+                particle.position.as_tuple_i32(),
                 Particle::RADIUS,
                 Particle::COLOR,
             )
@@ -69,8 +69,7 @@ pub fn main() -> Result<(), String> {
 
     let mut event_pump = sdl_context.event_pump()?;
 
-    const FPS: u64 = 60;
-    const FRAME_DURATION: Duration = Duration::from_nanos(1_000_000_000 / FPS);
+    const FRAME_DURATION: Duration = Duration::from_nanos(1_000_000_000 / constants::FPS);
     'running: loop {
         let frame_start = Instant::now();
         for event in event_pump.poll_iter() {
@@ -88,7 +87,7 @@ pub fn main() -> Result<(), String> {
             }
         }
 
-        context.next_tick();
+        context.update();
 
         if let Err(e) = renderer.draw(&context) {
             eprintln!("An error occurred while drawing: {}", e);
