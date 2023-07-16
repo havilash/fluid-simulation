@@ -7,27 +7,23 @@ use crate::game::vector::Vector;
 pub struct Particle {
     pub position: Vector,
     pub velocity: Vector,
-    pub acceleration: Vector,
 }
 
 impl Particle {
-    pub const RADIUS: u32 = 1;
+    pub const RADIUS: u32 = constants::PARTICLE_RADIUS;
     pub const COLOR: Color = Color::BLUE;
 
     pub fn new(position: (i32, i32), velocity: (f32, f32)) -> Particle {
-        let acceleration_gravity = Vector::new(0.0, 1.0) * (constants::GRAVITY as f32);
-        let mut acceleration = Vector::zero();
-        acceleration += acceleration_gravity;
-
         Particle {
             position: Vector::new(position.0 as f32, position.1 as f32),
             velocity: Vector::new(velocity.0, velocity.1),
-            acceleration: acceleration,
         }
     }
 
     pub fn update(&mut self, particles: Option<&[&Particle]>) {
-        let mut final_velocity = self.velocity + self.acceleration * (constants::DELTATIME as f32);
+        let acceleration = self.calculate_acceleration();
+
+        let mut final_velocity = self.velocity + acceleration * (constants::DELTATIME as f32);
         let particles = particles.unwrap_or(&[]);
         let mut normal = self.collide(particles);
         self.reflect(final_velocity, normal)
@@ -62,7 +58,6 @@ impl Particle {
         normal += self.collide_bounding();
         for particle in particles {
             if self.collide_particle(particle) {
-                // TODO: Fix Reflection
                 normal += (self.position - particle.position).normalize();
             }
         }
@@ -79,9 +74,21 @@ impl Particle {
     }
 
     fn next_position(&self) -> Vector {
-        let final_velocity = self.velocity + self.acceleration * (constants::DELTATIME as f32);
+        let acceleration = self.calculate_acceleration();
+
+        let final_velocity = self.velocity + acceleration * (constants::DELTATIME as f32);
         let displacement = (final_velocity + self.velocity) / 2.0 * (constants::DELTATIME as f32);
         let new_position = self.position + displacement;
         return new_position;
+    }
+
+    fn calculate_acceleration(&self) -> Vector {
+        let acceleration_gravity = Vector::new(0.0, 1.0) * (constants::GRAVITY as f32);
+        let drag_coefficient = constants::DRAG_COEFFICIENT;
+        let drag_force =
+            self.velocity.normalize() * -drag_coefficient * self.velocity.magnitude().powi(2);
+
+        let acceleration = acceleration_gravity + drag_force;
+        return acceleration;
     }
 }

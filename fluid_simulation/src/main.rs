@@ -58,7 +58,11 @@ pub fn main() -> Result<(), String> {
     let video_subsystem = sdl_context.video()?;
 
     let window = video_subsystem
-        .window("rust-sdl2 demo: Video", 800, 600)
+        .window(
+            "rust-sdl2 demo: Video",
+            constants::WINDOW_SIZE.0,
+            constants::WINDOW_SIZE.1,
+        )
         .position_centered()
         .opengl()
         .build()
