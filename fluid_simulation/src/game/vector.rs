@@ -84,7 +84,7 @@ impl Vector {
     }
 
     pub fn magnitude(&self) -> f32 {
-        (self.x * self.x + self.y * self.y).sqrt()
+        self.dot(*self).sqrt()
     }
     pub fn normalize(&self) -> Vector {
         let magnitude = self.magnitude();

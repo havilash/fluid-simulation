@@ -83,8 +83,9 @@ pub fn main() -> Result<(), String> {
                     keycode: Some(keycode),
                     ..
                 } => match keycode {
+                    Keycode::Escape => break 'running,
+                    Keycode::Space => context.toggle_pause(),
                     Keycode::R => context.reset(),
-                    Keycode::Escape => context.toggle_pause(),
                     _ => {}
                 },
                 _ => {}

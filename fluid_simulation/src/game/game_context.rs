@@ -23,7 +23,7 @@ impl GameContext {
         let mut particles: Vec<Particle> = Vec::new();
         for _ in 0..constants::PARTICLE_AMT {
             loop {
-                // Generate a random position for the particle
+                // random positions
                 let x = rng.gen_range(
                     Particle::RADIUS..(constants::WINDOW_SIZE.0 as u32 - Particle::RADIUS),
                 ) as f32;
@@ -31,7 +31,8 @@ impl GameContext {
                     Particle::RADIUS..(constants::WINDOW_SIZE.1 as u32 - Particle::RADIUS),
                 ) as f32;
                 let position = Vector::new(x, y);
-                // Check if the new position overlaps with any existing particles
+
+                // check overlap
                 let mut overlaps = false;
                 for particle in particles.iter() {
                     if (position - particle.position).magnitude() < (Particle::RADIUS * 2) as f32 {
@@ -40,7 +41,6 @@ impl GameContext {
                     }
                 }
 
-                // If the new position doesn't overlap with any existing particles, use it
                 if !overlaps {
                     particles.push(Particle::new(position.as_tuple_i32(), (100.0, -100.0)));
                     break;
@@ -49,7 +49,7 @@ impl GameContext {
         }
 
         GameContext {
-            state: GameState::Paused,
+            state: GameState::Playing,
             particles: particles.try_into().unwrap(),
             frame_count: 0,
         }
@@ -62,13 +62,12 @@ impl GameContext {
 
         self.frame_count += 1;
 
-        let particles = self.particles.clone();
-        for (i, particle) in self.particles.iter_mut().enumerate() {
-            let other_particles: Vec<_> = (0..particles.len())
-                .filter(|&j| i != j)
-                .map(|j| &particles[j])
-                .collect();
-            particle.update(Some(&other_particles[..]));
+        let particles = &mut self.particles;
+        for i in 0..particles.len() {
+            let (before, rest) = particles.split_at_mut(i);
+            let (particle, after) = rest.split_first_mut().unwrap();
+            let other_particles: Vec<_> = before.iter().chain(after.iter()).collect();
+            particle.update(Some(&other_particles));
         }
     }
 

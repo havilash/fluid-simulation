@@ -55,22 +55,32 @@ impl Particle {
 
     fn collide(&self, particles: &[&Particle]) -> Vector {
         let mut normal = Vector::zero();
-        normal += self.collide_bounding();
         for particle in particles {
             if self.collide_particle(particle) {
                 normal += (self.position - particle.position).normalize();
             }
         }
+        normal += self.collide_bounding();
         return normal.normalize();
     }
 
     fn reflect(&mut self, final_velocity: Vector, normal: Vector) {
         let new_final_velocity = final_velocity - normal * 2.0 * final_velocity.dot(normal);
-        let displacement =
-            (new_final_velocity + final_velocity) / 2.0 * (constants::DELTATIME as f32);
+        let displacement = new_final_velocity * (constants::DELTATIME as f32);
         let new_position = self.position + displacement;
         self.velocity = new_final_velocity;
         self.position = new_position;
+
+        self.position.x = new_position.x.max(Particle::RADIUS as f32);
+        self.position.x = self
+            .position
+            .x
+            .min(constants::WINDOW_SIZE.0 as f32 - Particle::RADIUS as f32);
+        self.position.y = new_position.y.max(Particle::RADIUS as f32);
+        self.position.y = self
+            .position
+            .y
+            .min(constants::WINDOW_SIZE.1 as f32 - Particle::RADIUS as f32);
     }
 
     fn next_position(&self) -> Vector {
