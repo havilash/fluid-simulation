@@ -68,11 +68,11 @@ impl Vector {
     }
 
     pub fn zero() -> Vector {
-        Vector { x: 0.0, y: 0.0 }
+        Self::new(0.0, 0.0)
     }
 
     pub fn one() -> Vector {
-        Vector { x: 1.0, y: 1.0 }
+        Self::new(1.0, 1.0)
     }
 
     pub fn sum(&self) -> f32 {
@@ -86,6 +86,7 @@ impl Vector {
     pub fn magnitude(&self) -> f32 {
         self.dot(*self).sqrt()
     }
+
     pub fn normalize(&self) -> Vector {
         let magnitude = self.magnitude();
         if magnitude == 0.0 {
@@ -93,6 +94,24 @@ impl Vector {
         } else {
             return Vector::new(self.x / magnitude, self.y / magnitude);
         }
+    }
+
+    pub fn max(&self, other: Vector) -> Vector {
+        Self::new(self.x.max(other.x), self.y.max(other.y))
+    }
+
+    pub fn min(&self, other: Vector) -> Vector {
+        Self::new(self.x.min(other.x), self.y.min(other.y))
+    }
+
+    pub fn clamp(&self, min: Vector, max: Vector) -> Vector {
+        Self::new(self.x.clamp(min.x, max.x), self.y.clamp(min.y, max.y))
+    }
+}
+
+impl From<(u32, u32)> for Vector {
+    fn from(size: (u32, u32)) -> Self {
+        Vector::new(size.0 as f32, size.1 as f32)
     }
 }
 
