@@ -35,7 +35,7 @@ impl Renderer {
             self.draw_heatmap(context)?;
         }
 
-        for particle in context.particles.iter() {
+        for particle in context.particles_lookup.particles.iter() {
             self.draw_circle(
                 particle.position.try_into().unwrap(),
                 Particle::RADIUS,
@@ -81,43 +81,6 @@ impl Renderer {
             }
         }
         Ok(())
-    }
-
-    pub fn draw_arrow(&mut self, start: (i32, i32), end: (i32, i32), color: Color) {
-        // Draw the line part of the arrow
-        self.canvas.set_draw_color(color);
-        self.canvas.draw_line(start, end).unwrap();
-
-        // Calculate the direction vector of the arrow
-        let direction = Vector::new(end.0 as f32 - start.0 as f32, end.1 as f32 - start.1 as f32);
-        let unit_direction = direction.normalize();
-        let perpendicular = Vector::new(-unit_direction.y, unit_direction.x) * 10.0; // Adjust the size of the arrowhead
-        let end_vec = Vector::new(end.0 as f32, end.1 as f32);
-
-        // Draw the arrowhead (two lines at an angle to the main line)
-        let arrowhead1: (i32, i32) = (end_vec + unit_direction + perpendicular)
-            .try_into()
-            .unwrap();
-        let arrowhead2: (i32, i32) = (end_vec + unit_direction - perpendicular)
-            .try_into()
-            .unwrap();
-        self.canvas.draw_line(end, arrowhead1).unwrap();
-        self.canvas.draw_line(end, arrowhead2).unwrap();
-    }
-
-    pub fn draw_arrow_with_angle(
-        &mut self,
-        pos: (i32, i32),
-        angle: f32,
-        length: f32,
-        color: Color,
-    ) {
-        // Calculate the end point of the arrow
-        let end_x = pos.0 as f32 + angle.cos() * length;
-        let end_y = pos.1 as f32 - angle.sin() * length; // Negative sin because y-axis is flipped in SDL
-
-        // Draw the arrow
-        self.draw_arrow(pos, (end_x as i32, end_y as i32), color);
     }
 }
 

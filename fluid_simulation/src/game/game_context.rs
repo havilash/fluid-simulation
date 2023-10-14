@@ -1,13 +1,12 @@
-use std::f32::consts::PI;
-
 use rand::Rng;
 
-use crate::constants::{self, WINDOW_SIZE};
+use crate::constants::{self};
 use crate::game::utils::calculate_density;
 
 use crate::game::particle::Particle;
 
-use super::spatial_lookup::SpatialLookup;
+use super::particle;
+use super::particles_lookup::ParticlesLookup;
 use super::vector::Vector;
 
 #[derive(PartialEq)]
@@ -18,11 +17,10 @@ pub enum GameState {
 
 pub struct GameContext {
     pub state: GameState,
-    pub particles: [Particle; constants::PARTICLE_AMT as usize],
     pub frame_count: u32,
     pub heatmap: Vec<Vec<f32>>,
     pub heatmap_resolution: u32,
-    pub spatial_lookup: SpatialLookup,
+    pub particles_lookup: ParticlesLookup,
 }
 
 impl GameContext {
@@ -36,24 +34,27 @@ impl GameContext {
             Self::create_particles_grid()
         };
 
-        let spatial_lookup_size = Particle::SMOOTHING_RADIUS as f32;
-        let spatial_lookup_dimensions: (usize, usize) = (Vector::from(constants::WINDOW_SIZE)
-            / spatial_lookup_size)
+        let particles_lookup_size = Particle::SMOOTHING_RADIUS as f32;
+        let particles_lookup_dimensions: (usize, usize) = (Vector::from(constants::WINDOW_SIZE)
+            / particles_lookup_size)
             .ceil()
             .try_into()
             .unwrap();
 
         GameContext {
             state: GameState::Paused,
-            particles: particles,
             frame_count: 0,
             heatmap: vec![vec![0.0; heatmap_height]; heatmap_width],
             heatmap_resolution: heatmap_resolution,
-            spatial_lookup: SpatialLookup::new(spatial_lookup_size, spatial_lookup_dimensions),
+            particles_lookup: ParticlesLookup::new(
+                particles,
+                particles_lookup_size,
+                particles_lookup_dimensions,
+            ),
         }
     }
 
-    fn create_particles_grid() -> [Particle; constants::PARTICLE_AMT as usize] {
+    fn create_particles_grid() -> Vec<Particle> {
         let particle_amt = constants::PARTICLE_AMT;
         let spacing = constants::PARTICLE_SPACING as i32;
         let rows = (particle_amt as f32).sqrt().ceil() as i32;
@@ -72,14 +73,13 @@ impl GameContext {
                 Particle::new(pos.try_into().unwrap(), (0.0, 0.0))
             })
             .collect::<Vec<_>>()
-            .try_into()
-            .unwrap()
     }
 
-    fn create_particles_random_pos() -> [Particle; constants::PARTICLE_AMT as usize] {
+    fn create_particles_random_pos() -> Vec<Particle> {
         let window_size = constants::WINDOW_SIZE;
         let radius = Particle::RADIUS;
-        let mut particles = [Particle::new((0, 0), (0.0, 0.0)); constants::PARTICLE_AMT as usize];
+        let mut particles =
+            vec![Particle::new((0, 0), (0.0, 0.0)); constants::PARTICLE_AMT as usize];
         let mut rng = rand::thread_rng();
 
         for i in 0..constants::PARTICLE_AMT {
@@ -112,27 +112,25 @@ impl GameContext {
         }
 
         self.frame_count += 1;
-        self.update_spatial_lookup();
-        for i in 0..self.particles.len() {
-            let (before, current_and_rest) = self.particles.split_at_mut(i);
+
+        self.particles_lookup.update_cells();
+
+        let lookup_clone = self.particles_lookup.copy();
+        let particles = &mut self.particles_lookup.particles;
+        for i in 0..particles.len() {
+            let (before, current_and_rest) = particles.split_at_mut(i);
             let (current, rest) = current_and_rest.split_first_mut().unwrap();
             let other_particles = &[before, rest].concat();
 
-            self.particles[i].update(false, other_particles, &self.spatial_lookup);
+            current.update(true, &other_particles, &lookup_clone);
         }
 
         if show_heatmap {
-            print!(
-                "{:?}",
-                self.spatial_lookup
-                    .query_radius(Vector::new(0.0, 0.0), 28.0, self.particles)
-            );
             for x in 0..self.heatmap.len() {
                 for y in 0..self.heatmap[0].len() {
                     self.heatmap[x][y] = calculate_density(
                         Vector::new(x as f32, y as f32) * self.heatmap_resolution as f32,
-                        &self.particles,
-                        &self.spatial_lookup,
+                        &self.particles_lookup,
                     );
                 }
             }
@@ -145,12 +143,6 @@ impl GameContext {
         self.state = match self.state {
             GameState::Playing => GameState::Paused,
             GameState::Paused => GameState::Playing,
-        }
-    }
-
-    fn update_spatial_lookup(&mut self) {
-        for (i, particle) in self.particles.iter().enumerate() {
-            self.spatial_lookup.add_particle(i, particle)
         }
     }
 }
