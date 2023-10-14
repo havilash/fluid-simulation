@@ -4,14 +4,20 @@ use rand::Rng;
 
 use crate::constants;
 
-use super::{particle::Particle, vector::Vector};
+use super::{particle::Particle, spatial_lookup::SpatialLookup, vector::Vector};
 
-pub fn calculate_density(point: Vector, particles: &[Particle]) -> f32 {
+pub fn calculate_density(
+    point: Vector,
+    particles: &[Particle],
+    particles_lookup: &SpatialLookup,
+) -> f32 {
     let mut density = 0.0;
+    // let neighbors =
+    //     particles_lookup.query_radius(point, Particle::SMOOTHING_RADIUS as f32, particles);
     for p in particles {
         let dst = (p.position - point).magnitude();
         let influence = smoothing_kernel(dst);
-        density += Particle::MASS * influence
+        density += Particle::MASS * influence;
     }
     return density;
 }

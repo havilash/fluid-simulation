@@ -37,7 +37,7 @@ impl Renderer {
 
         for particle in context.particles.iter() {
             self.draw_circle(
-                particle.position.as_tuple_i32(),
+                particle.position.try_into().unwrap(),
                 Particle::RADIUS,
                 Particle::COLOR,
             )
@@ -74,7 +74,7 @@ impl Renderer {
                 let size = (res as u32, res as u32);
 
                 self.draw_rect(
-                    pos.as_tuple_i32(),
+                    pos.try_into().unwrap(),
                     size,
                     Color::RGBA(255, 0, 0, alpha as u8),
                 );
@@ -95,8 +95,12 @@ impl Renderer {
         let end_vec = Vector::new(end.0 as f32, end.1 as f32);
 
         // Draw the arrowhead (two lines at an angle to the main line)
-        let arrowhead1 = (end_vec + unit_direction + perpendicular).as_tuple_i32();
-        let arrowhead2 = (end_vec + unit_direction - perpendicular).as_tuple_i32();
+        let arrowhead1: (i32, i32) = (end_vec + unit_direction + perpendicular)
+            .try_into()
+            .unwrap();
+        let arrowhead2: (i32, i32) = (end_vec + unit_direction - perpendicular)
+            .try_into()
+            .unwrap();
         self.canvas.draw_line(end, arrowhead1).unwrap();
         self.canvas.draw_line(end, arrowhead2).unwrap();
     }
@@ -132,7 +136,7 @@ pub fn main() -> Result<(), String> {
         .build()
         .map_err(|e| e.to_string())?;
 
-    let mut context = GameContext::new(true, 10);
+    let mut context = GameContext::new(false, 16);
     let mut renderer = Renderer::new(window)?;
 
     let mut event_pump = sdl_context.event_pump()?;

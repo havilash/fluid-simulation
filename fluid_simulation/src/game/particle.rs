@@ -7,7 +7,10 @@ use crate::constants;
 use crate::game::utils::calculate_density;
 use crate::game::vector::Vector;
 
-use super::utils::{calculate_shared_pressure, random_direction, smoothing_kernel_derivative};
+use super::{
+    spatial_lookup::SpatialLookup,
+    utils::{calculate_shared_pressure, random_direction, smoothing_kernel_derivative},
+};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Particle {
@@ -30,14 +33,18 @@ impl Particle {
         }
     }
 
-    pub fn update(&mut self, use_gravity: bool, other_particles: Option<&[Particle]>) {
-        let other_particles = other_particles.unwrap_or(&[]);
-        self.density = calculate_density(self.position, other_particles);
-        let mut acceleration = self.calculate_acceleration(use_gravity, other_particles);
+    pub fn update(
+        &mut self,
+        use_gravity: bool,
+        particles: &[Particle],
+        spatial_lookup: &SpatialLookup,
+    ) {
+        self.density = calculate_density(self.position, particles, spatial_lookup);
+        let acceleration = self.calculate_acceleration(use_gravity, particles);
 
-        let mut final_velocity = self.velocity + acceleration * (constants::DELTATIME as f32);
-        let mut normal = self.collide(use_gravity, other_particles);
-        self.reflect(final_velocity, normal)
+        let final_velocity = self.velocity + acceleration * (constants::DELTATIME as f32);
+        let normal = self.collide(use_gravity, particles);
+        self.reflect(final_velocity, normal);
     }
 
     fn collide_bounding(&self, position: Vector) -> Vector {
@@ -52,19 +59,17 @@ impl Particle {
         } else if (position.y + Self::RADIUS as f32) > constants::WINDOW_SIZE.1 as f32 {
             normal += Vector::new(0.0, -1.0);
         }
-        return normal.normalize() * constants::COLLISION_DAMPING;
-    }
-
-    fn collide(&self, use_gravity: bool, other_particles: &[Particle]) -> Vector {
-        let mut normal = Vector::zero();
-        let new_position = self.next_position(use_gravity, other_particles);
-        normal += self.collide_bounding(new_position);
         return normal;
     }
 
-    fn reflect(&mut self, final_velocity: Vector, normal: Vector) {
-        let window_size = constants::WINDOW_SIZE;
+    fn collide(&self, use_gravity: bool, particles: &[Particle]) -> Vector {
+        let mut normal = Vector::zero();
+        let new_position = self.next_position(use_gravity, particles);
+        normal += self.collide_bounding(new_position);
+        return normal.normalize() * constants::COLLISION_DAMPING;
+    }
 
+    fn reflect(&mut self, final_velocity: Vector, normal: Vector) {
         let new_final_velocity = final_velocity - normal * 2.0 * final_velocity.dot(normal);
         let displacement = new_final_velocity * (constants::DELTATIME as f32);
 
@@ -74,7 +79,7 @@ impl Particle {
         self.position = new_position;
     }
 
-    fn calculate_acceleration(&self, use_gravity: bool, other_particles: &[Particle]) -> Vector {
+    fn calculate_acceleration(&self, use_gravity: bool, particles: &[Particle]) -> Vector {
         let mut acceleration = Vector::zero();
 
         if use_gravity {
@@ -82,8 +87,13 @@ impl Particle {
             acceleration += acceleration_gravity;
         }
 
-        let pressure_force = self.calculate_pressure_force(other_particles);
-        acceleration += pressure_force / self.density;
+        let drag_coefficient = constants::DRAG_COEFFICIENT;
+        let drag_force =
+            self.velocity.normalize() * -drag_coefficient * self.velocity.magnitude().powi(2);
+        acceleration += drag_force / Self::MASS;
+
+        let pressure_force = self.calculate_pressure_force(particles);
+        acceleration += pressure_force / (self.density + 1e-3);
 
         acceleration
     }
@@ -97,9 +107,10 @@ impl Particle {
         return new_position;
     }
 
-    fn calculate_pressure_force(&self, other_particles: &[Particle]) -> Vector {
+    fn calculate_pressure_force(&self, particles: &[Particle]) -> Vector {
         let mut pressure_force: Vector = Vector::zero();
-        for other in other_particles {
+
+        for other in particles {
             let offset = other.position - self.position;
             let dst = offset.magnitude();
             let dir = if dst == 0.0 {
@@ -110,7 +121,7 @@ impl Particle {
 
             let slope = smoothing_kernel_derivative(dst);
             let pressure = calculate_shared_pressure(self.density, other.density);
-            pressure_force -= dir * pressure * slope * Self::MASS / self.density;
+            pressure_force -= dir * pressure * slope * Self::MASS / (other.density + 1e-3);
         }
         return pressure_force;
     }

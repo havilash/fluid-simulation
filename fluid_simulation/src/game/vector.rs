@@ -59,14 +59,6 @@ impl Vector {
         Vector { x, y }
     }
 
-    pub fn as_tuple(&self) -> (f32, f32) {
-        (self.x, self.y)
-    }
-
-    pub fn as_tuple_i32(&self) -> (i32, i32) {
-        (self.x as i32, self.y as i32)
-    }
-
     pub fn zero() -> Vector {
         Self::new(0.0, 0.0)
     }
@@ -96,12 +88,20 @@ impl Vector {
         }
     }
 
-    pub fn max(&self, other: Vector) -> Vector {
-        Self::new(self.x.max(other.x), self.y.max(other.y))
+    pub fn ceil(&self) -> Vector {
+        Self::new(self.x.ceil(), self.y.ceil())
     }
 
-    pub fn min(&self, other: Vector) -> Vector {
-        Self::new(self.x.min(other.x), self.y.min(other.y))
+    pub fn floor(&self) -> Vector {
+        Self::new(self.x.floor(), self.y.floor())
+    }
+
+    pub fn max(&self, value: f32) -> Vector {
+        Self::new(self.x.max(value), self.y.max(value))
+    }
+
+    pub fn min(&self, value: f32) -> Vector {
+        Self::new(self.x.min(value), self.y.min(value))
     }
 
     pub fn clamp(&self, min: Vector, max: Vector) -> Vector {
@@ -112,6 +112,44 @@ impl Vector {
 impl From<(u32, u32)> for Vector {
     fn from(size: (u32, u32)) -> Self {
         Vector::new(size.0 as f32, size.1 as f32)
+    }
+}
+
+impl TryInto<(usize, usize)> for Vector {
+    type Error = std::num::TryFromIntError;
+
+    fn try_into(self) -> Result<(usize, usize), Self::Error> {
+        let x = self.x as usize;
+        let y = self.y as usize;
+        Ok((x, y))
+    }
+}
+
+impl TryInto<(u32, u32)> for Vector {
+    type Error = std::num::TryFromIntError;
+
+    fn try_into(self) -> Result<(u32, u32), Self::Error> {
+        let x = self.x as u32;
+        let y = self.y as u32;
+        Ok((x, y))
+    }
+}
+
+impl TryInto<(i32, i32)> for Vector {
+    type Error = std::num::TryFromIntError;
+
+    fn try_into(self) -> Result<(i32, i32), Self::Error> {
+        let x = self.x as i32;
+        let y = self.y as i32;
+        Ok((x, y))
+    }
+}
+
+impl TryInto<(f32, f32)> for Vector {
+    type Error = std::num::TryFromIntError;
+
+    fn try_into(self) -> Result<(f32, f32), Self::Error> {
+        Ok((self.x, self.y))
     }
 }
 
