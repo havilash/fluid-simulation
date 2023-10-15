@@ -18,6 +18,7 @@ pub fn calculate_density(point: Vector, particles_lookup: &ParticlesLookup) -> f
 }
 
 // TODO: better smoothing kernel (spickier)
+// Integrate[(s-x)^3x,{x,0,s},{θ,0,2π}]
 pub fn smoothing_kernel(dst: f32, radius: f32) -> f32 {
     if dst >= radius {
         return 0.0;

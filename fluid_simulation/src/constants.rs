@@ -12,6 +12,6 @@ pub const PARTICLE_AMT: usize = 1028;
 pub const PARTICLE_RADIUS: u32 = 4;
 pub const PARTICLE_SPACING: u32 = 12;
 
-pub const SMOOTHING_RADIUS: u32 = 24;
-pub const DENSITY_FLOOR: f32 = 0.8;
-pub const PRESSURE_CONSTANT: f32 = 100.0;
+pub const SMOOTHING_RADIUS: u32 = 32;
+pub const DENSITY_FLOOR: f32 = 0.1;
+pub const PRESSURE_CONSTANT: f32 = 500.0;

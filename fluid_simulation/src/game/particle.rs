@@ -133,7 +133,7 @@ impl Particle {
     ) -> Vector {
         let mut pressure_force: Vector = Vector::zero();
 
-        // TODO: only for particles in radius
+        // TODO: calculate pressure force only for particles in radius
         for other in other_particles {
             if self == other {
                 continue;
