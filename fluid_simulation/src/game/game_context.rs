@@ -5,6 +5,7 @@ use crate::game::utils::calculate_density;
 
 use crate::game::particle::Particle;
 
+use super::cursor::Cursor;
 use super::particle;
 use super::particles_lookup::ParticlesLookup;
 use super::vector::Vector;
@@ -106,7 +107,7 @@ impl GameContext {
         particles
     }
 
-    pub fn update(&mut self, show_heatmap: bool) {
+    pub fn update(&mut self, show_heatmap: bool, use_gravity: bool, cursor: Cursor) {
         if GameState::Paused == self.state {
             return;
         }
@@ -115,29 +116,49 @@ impl GameContext {
 
         self.particles_lookup.update_cells();
 
-        let lookup_clone = self.particles_lookup.copy();
-        let particles = &mut self.particles_lookup.particles;
-        for i in 0..particles.len() {
-            let (before, current_and_rest) = particles.split_at_mut(i);
-            let (current, rest) = current_and_rest.split_first_mut().unwrap();
-            let other_particles = &[before, rest].concat();
-
-            current.update(true, &other_particles, &lookup_clone);
+        for i in 0..constants::PARTICLE_AMT {
+            let (other_particles, current_option) =
+                self.particles_lookup.query_radius(None, None, Some(i));
+            // let (other_particles, current_option) = self.particles_lookup.query_all(Some(i));
+            if let Some(current) = current_option {
+                current.update(use_gravity, &other_particles, cursor);
+            }
         }
 
         if show_heatmap {
-            for x in 0..self.heatmap.len() {
-                for y in 0..self.heatmap[0].len() {
-                    self.heatmap[x][y] = calculate_density(
-                        Vector::new(x as f32, y as f32) * self.heatmap_resolution as f32,
-                        &self.particles_lookup,
-                    );
-                }
+            self.update_heatmap()
+        }
+    }
+
+    pub fn update_heatmap(&mut self) {
+        for x in 0..self.heatmap.len() {
+            for y in 0..self.heatmap[0].len() {
+                let point = Vector::new(x as f32, y as f32) * self.heatmap_resolution as f32;
+                let (other_particles, _) = self.particles_lookup.query_radius(
+                    Some(point),
+                    Some(Particle::SMOOTHING_RADIUS as f32),
+                    None,
+                );
+
+                let density = calculate_density(point, &other_particles);
+                self.heatmap[x][y] = density;
             }
         }
     }
 
-    pub fn reset(&mut self) {}
+    pub fn reset(&mut self, use_random_pos: bool) {
+        let particles = if use_random_pos {
+            Self::create_particles_random_pos()
+        } else {
+            Self::create_particles_grid()
+        };
+
+        self.particles_lookup.particles = particles;
+
+        self.particles_lookup.update_cells();
+
+        self.update_heatmap();
+    }
 
     pub fn toggle_pause(&mut self) {
         self.state = match self.state {

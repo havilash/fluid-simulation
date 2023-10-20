@@ -1,3 +1,4 @@
+pub mod cursor;
 pub mod game_context;
 pub mod particle;
 pub mod particles_lookup;

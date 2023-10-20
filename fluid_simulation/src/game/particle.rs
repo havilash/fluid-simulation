@@ -8,7 +8,7 @@ use crate::game::utils::calculate_density;
 use crate::game::vector::Vector;
 
 use super::{
-    particles_lookup::ParticlesLookup,
+    cursor::{self, Cursor, CursorForceType},
     utils::{
         calculate_shared_pressure, random_direction, smoothing_kernel, smoothing_kernel_derivative,
     },
@@ -35,18 +35,12 @@ impl Particle {
         }
     }
 
-    pub fn update(
-        &mut self,
-        use_gravity: bool,
-        other_particles: &[Particle],
-        particles_lookup: &ParticlesLookup,
-    ) {
-        self.density = self.calculate_density(self.position, particles_lookup);
-        let acceleration =
-            self.calculate_acceleration(use_gravity, other_particles, particles_lookup);
+    pub fn update(&mut self, use_gravity: bool, other_particles: &Vec<Particle>, cursor: Cursor) {
+        self.density = self.calculate_density(self.position, other_particles);
+        let acceleration = self.calculate_acceleration(use_gravity, other_particles, cursor);
 
         let final_velocity = self.velocity + acceleration * (constants::DELTATIME as f32);
-        let normal = self.collide(use_gravity, other_particles, particles_lookup);
+        let normal = self.collide(acceleration);
         self.reflect(final_velocity, normal);
     }
 
@@ -65,14 +59,9 @@ impl Particle {
         return normal;
     }
 
-    fn collide(
-        &self,
-        use_gravity: bool,
-        other_particles: &[Particle],
-        particles_lookup: &ParticlesLookup,
-    ) -> Vector {
+    fn collide(&self, acceleration: Vector) -> Vector {
         let mut normal = Vector::zero();
-        let new_position = self.next_position(use_gravity, other_particles, particles_lookup);
+        let new_position = self.next_position(acceleration);
         normal += self.collide_bounding(new_position);
         return normal.normalize() * constants::COLLISION_DAMPING;
     }
@@ -90,8 +79,8 @@ impl Particle {
     fn calculate_acceleration(
         &self,
         use_gravity: bool,
-        other_particles: &[Particle],
-        particles_lookup: &ParticlesLookup,
+        other_particles: &Vec<Particle>,
+        cursor: Cursor,
     ) -> Vector {
         let mut acceleration = Vector::zero();
 
@@ -105,35 +94,51 @@ impl Particle {
             self.velocity.normalize() * -drag_coefficient * self.velocity.magnitude().powi(2);
         acceleration += drag_force / Self::MASS;
 
-        let pressure_force = self.calculate_pressure_force(other_particles, particles_lookup);
+        let pressure_force = self.calculate_pressure_force(other_particles);
         acceleration += pressure_force / (self.density + 1e-3);
+
+        let cursor_force = self.calculate_cursor_force(cursor);
+        acceleration += cursor_force / (self.density + 1e-3);
 
         acceleration
     }
 
-    fn next_position(
-        &self,
-        use_gravity: bool,
-        other_particles: &[Particle],
-        particles_lookup: &ParticlesLookup,
-    ) -> Vector {
-        let acceleration =
-            self.calculate_acceleration(use_gravity, other_particles, particles_lookup);
-
+    fn next_position(&self, acceleration: Vector) -> Vector {
         let final_velocity = self.velocity + acceleration * (constants::DELTATIME as f32);
         let displacement = final_velocity * (constants::DELTATIME as f32);
         let new_position = self.position + displacement;
         return new_position;
     }
 
-    fn calculate_pressure_force(
-        &self,
-        other_particles: &[Particle],
-        particles_lookup: &ParticlesLookup,
-    ) -> Vector {
+    fn calculate_cursor_force(&self, cursor: Cursor) -> Vector {
+        if cursor.force_type == CursorForceType::None {
+            return Vector::zero();
+        }
+        let offset = cursor.position - self.position;
+        let dst = offset.magnitude();
+        let dir = if dst == 0.0 {
+            random_direction()
+        } else {
+            offset / dst
+        };
+        let mut force = Vector::zero();
+        if dst < cursor.radius as f32 {
+            match cursor.force_type {
+                CursorForceType::Attract => {
+                    force = dir;
+                }
+                CursorForceType::Repel => {
+                    force = dir * -1.0;
+                }
+                _ => {}
+            }
+        }
+        return force * constants::CURSOR_CONSTANT;
+    }
+
+    fn calculate_pressure_force(&self, other_particles: &Vec<Particle>) -> Vector {
         let mut pressure_force: Vector = Vector::zero();
 
-        // TODO: calculate pressure force only for particles in radius
         for other in other_particles {
             if self == other {
                 continue;
@@ -147,19 +152,17 @@ impl Particle {
                 offset / dst
             };
 
-            let slope = smoothing_kernel_derivative(dst);
+            let slope = smoothing_kernel_derivative(dst, self.get_smoothing_radius());
             let pressure = calculate_shared_pressure(self.density, other.density);
-            pressure_force -= dir * pressure * slope * Self::MASS / (other.density + 1e-3);
+            pressure_force -= dir * pressure * slope;
         }
         return pressure_force;
     }
 
-    pub fn calculate_density(&self, point: Vector, particles_lookup: &ParticlesLookup) -> f32 {
+    pub fn calculate_density(&self, point: Vector, other_particles: &Vec<Particle>) -> f32 {
         let mut density = 0.0;
-        let neighbors = particles_lookup.query_radius(point, Particle::SMOOTHING_RADIUS as f32);
-        // let neighbors = particles_lookup.query_all();
-        for p in neighbors {
-            if *self == p {
+        for p in other_particles {
+            if self == p {
                 continue;
             }
             let dst = (p.position - point).magnitude();

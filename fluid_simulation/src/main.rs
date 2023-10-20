@@ -4,7 +4,8 @@ extern crate sdl2;
 
 use game::particle::Particle;
 use game::vector::Vector;
-use sdl2::keyboard::Keycode;
+use sdl2::keyboard::{Keycode, Mod};
+use sdl2::mouse;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::{BlendMode, WindowCanvas};
@@ -15,6 +16,8 @@ use std::time::{Duration, Instant};
 mod constants;
 mod game;
 use game::game_context::GameContext;
+
+use crate::game::cursor::{self, Cursor, CursorForceType};
 
 pub struct Renderer {
     canvas: WindowCanvas,
@@ -99,13 +102,20 @@ pub fn main() -> Result<(), String> {
         .build()
         .map_err(|e| e.to_string())?;
 
-    let mut context = GameContext::new(false, 16);
+    let mut context = GameContext::new(true, 8);
+    context.update_heatmap();
+
     let mut renderer = Renderer::new(window)?;
 
     let mut event_pump = sdl_context.event_pump()?;
 
     let mut show_heatmap = false;
 
+    let mut cursor = Cursor::new(
+        Vector::new(-1.0, -1.0),
+        CursorForceType::None,
+        constants::CURSOR_RADIUS,
+    );
     const FRAME_DURATION: Duration = Duration::from_nanos(1_000_000_000 / constants::FPS);
     'running: loop {
         let frame_start = Instant::now();
@@ -114,26 +124,43 @@ pub fn main() -> Result<(), String> {
                 Event::Quit { .. } => break 'running,
                 Event::KeyDown {
                     keycode: Some(keycode),
+                    keymod,
                     ..
-                } => match keycode {
-                    Keycode::Escape => break 'running,
-                    Keycode::Space => context.toggle_pause(),
-                    Keycode::R => context.reset(),
-                    Keycode::LShift => show_heatmap = true,
+                } => match (keycode, keymod) {
+                    (Keycode::Escape, _) => break 'running,
+                    (Keycode::Space, _) => context.toggle_pause(),
+                    (Keycode::R, keymod) if keymod.contains(Mod::LSHIFTMOD) => context.reset(false),
+                    (Keycode::R, _) => context.reset(true),
+                    (Keycode::H, _) => show_heatmap = true,
                     _ => {}
                 },
                 Event::KeyUp {
                     keycode: Some(keycode),
+                    keymod,
                     ..
-                } => match keycode {
-                    Keycode::LShift => show_heatmap = false,
+                } => match (keycode, keymod) {
+                    (Keycode::H, _) => show_heatmap = false,
                     _ => {}
                 },
+                Event::MouseMotion { x, y, .. } => {
+                    cursor.position.x = x as f32;
+                    cursor.position.y = y as f32;
+                }
+                Event::MouseButtonDown { mouse_btn, .. } => match mouse_btn {
+                    mouse::MouseButton::Left => cursor.force_type = CursorForceType::Attract,
+                    mouse::MouseButton::Right => cursor.force_type = CursorForceType::Repel,
+                    _ => {}
+                },
+                Event::MouseButtonUp { .. } => cursor.force_type = CursorForceType::None,
+                Event::MouseWheel { y, .. } => {
+                    cursor.radius += y as f32 * 10.0;
+                    cursor.radius.max(0.0);
+                }
                 _ => {}
             }
         }
 
-        context.update(show_heatmap);
+        context.update(show_heatmap, true, cursor);
 
         if let Err(e) = renderer.draw(&context, show_heatmap) {
             eprintln!("An error occurred while drawing: {}", e);
