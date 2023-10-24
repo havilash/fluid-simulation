@@ -35,6 +35,16 @@ pub fn smoothing_kernel_derivative(dst: f32, radius: f32) -> f32 {
     return (dst - radius) * scale;
 }
 
+pub fn viscosity_smoothing_kernel(dst: f32, radius: f32) -> f32 {
+    if dst >= radius {
+        return 0.0;
+    }
+
+    let volume = (PI * radius.powi(8)) / 4.0;
+    let value = (radius.powi(2) - dst.powi(2)).max(0.0);
+    return value.powi(3) / volume;
+}
+
 pub fn density_to_pressure(density: f32) -> f32 {
     return constants::PRESSURE_CONSTANT * (density - constants::DENSITY_FLOOR);
 }

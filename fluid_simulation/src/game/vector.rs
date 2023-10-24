@@ -115,6 +115,18 @@ impl From<(u32, u32)> for Vector {
     }
 }
 
+impl From<(i32, i32)> for Vector {
+    fn from(size: (i32, i32)) -> Self {
+        Vector::new(size.0 as f32, size.1 as f32)
+    }
+}
+
+impl From<(f32, f32)> for Vector {
+    fn from(size: (f32, f32)) -> Self {
+        Vector::new(size.0 as f32, size.1 as f32)
+    }
+}
+
 impl TryInto<(usize, usize)> for Vector {
     type Error = std::num::TryFromIntError;
 

@@ -18,7 +18,6 @@ pub enum GameState {
 
 pub struct GameContext {
     pub state: GameState,
-    pub frame_count: u32,
     pub heatmap: Vec<Vec<f32>>,
     pub heatmap_resolution: u32,
     pub particles_lookup: ParticlesLookup,
@@ -44,7 +43,6 @@ impl GameContext {
 
         GameContext {
             state: GameState::Paused,
-            frame_count: 0,
             heatmap: vec![vec![0.0; heatmap_height]; heatmap_width],
             heatmap_resolution: heatmap_resolution,
             particles_lookup: ParticlesLookup::new(
@@ -107,21 +105,14 @@ impl GameContext {
         particles
     }
 
-    pub fn update(&mut self, show_heatmap: bool, use_gravity: bool, cursor: Cursor) {
-        if GameState::Paused == self.state {
-            return;
-        }
-
-        self.frame_count += 1;
-
+    pub fn update(&mut self, show_heatmap: bool, cursor: Cursor, delta_time: f32) {
         self.particles_lookup.update_cells();
 
         for i in 0..constants::PARTICLE_AMT {
             let (other_particles, current_option) =
                 self.particles_lookup.query_radius(None, None, Some(i));
-            // let (other_particles, current_option) = self.particles_lookup.query_all(Some(i));
             if let Some(current) = current_option {
-                current.update(use_gravity, &other_particles, cursor);
+                current.update(&other_particles, cursor, delta_time);
             }
         }
 
@@ -131,6 +122,7 @@ impl GameContext {
     }
 
     pub fn update_heatmap(&mut self) {
+        let mut density_sum = 0.0;
         for x in 0..self.heatmap.len() {
             for y in 0..self.heatmap[0].len() {
                 let point = Vector::new(x as f32, y as f32) * self.heatmap_resolution as f32;
@@ -142,6 +134,7 @@ impl GameContext {
 
                 let density = calculate_density(point, &other_particles);
                 self.heatmap[x][y] = density;
+                density_sum += density;
             }
         }
     }

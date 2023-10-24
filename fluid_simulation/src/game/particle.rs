@@ -11,6 +11,7 @@ use super::{
     cursor::{self, Cursor, CursorForceType},
     utils::{
         calculate_shared_pressure, random_direction, smoothing_kernel, smoothing_kernel_derivative,
+        viscosity_smoothing_kernel,
     },
 };
 
@@ -19,6 +20,7 @@ pub struct Particle {
     pub position: Vector,
     pub velocity: Vector,
     pub density: f32,
+    pub predicted_position: Vector,
 }
 
 impl Particle {
@@ -29,19 +31,20 @@ impl Particle {
 
     pub fn new(position: (i32, i32), velocity: (f32, f32)) -> Particle {
         Particle {
-            position: Vector::new(position.0 as f32, position.1 as f32),
-            velocity: Vector::new(velocity.0, velocity.1),
+            position: Vector::from(position),
+            velocity: Vector::from(velocity),
             density: 0.0,
+            predicted_position: Vector::from(position),
         }
     }
 
-    pub fn update(&mut self, use_gravity: bool, other_particles: &Vec<Particle>, cursor: Cursor) {
+    pub fn update(&mut self, other_particles: &Vec<Particle>, cursor: Cursor, delta_time: f32) {
         self.density = self.calculate_density(self.position, other_particles);
-        let acceleration = self.calculate_acceleration(use_gravity, other_particles, cursor);
+        let acceleration = self.calculate_acceleration(other_particles, cursor);
 
-        let final_velocity = self.velocity + acceleration * (constants::DELTATIME as f32);
-        let normal = self.collide(acceleration);
-        self.reflect(final_velocity, normal);
+        let final_velocity = self.velocity + acceleration * delta_time;
+        let normal = self.collide(acceleration, delta_time);
+        self.reflect(final_velocity, normal, delta_time);
     }
 
     fn collide_bounding(&self, position: Vector) -> Vector {
@@ -59,16 +62,16 @@ impl Particle {
         return normal;
     }
 
-    fn collide(&self, acceleration: Vector) -> Vector {
+    fn collide(&self, acceleration: Vector, delta_time: f32) -> Vector {
         let mut normal = Vector::zero();
-        let new_position = self.next_position(acceleration);
+        let new_position = self.next_position(acceleration, delta_time);
         normal += self.collide_bounding(new_position);
         return normal.normalize() * constants::COLLISION_DAMPING;
     }
 
-    fn reflect(&mut self, final_velocity: Vector, normal: Vector) {
+    fn reflect(&mut self, final_velocity: Vector, normal: Vector, delta_time: f32) {
         let new_final_velocity = final_velocity - normal * 2.0 * final_velocity.dot(normal);
-        let displacement = new_final_velocity * (constants::DELTATIME as f32);
+        let displacement = new_final_velocity * delta_time;
 
         let new_position = self.position + displacement;
 
@@ -76,18 +79,11 @@ impl Particle {
         self.position = new_position;
     }
 
-    fn calculate_acceleration(
-        &self,
-        use_gravity: bool,
-        other_particles: &Vec<Particle>,
-        cursor: Cursor,
-    ) -> Vector {
+    fn calculate_acceleration(&self, other_particles: &Vec<Particle>, cursor: Cursor) -> Vector {
         let mut acceleration = Vector::zero();
 
-        if use_gravity {
-            let acceleration_gravity = Vector::new(0.0, 1.0) * (constants::GRAVITY as f32);
-            acceleration += acceleration_gravity;
-        }
+        let acceleration_gravity = Vector::new(0.0, 1.0) * (constants::GRAVITY as f32);
+        acceleration += acceleration_gravity;
 
         let drag_coefficient = constants::DRAG_COEFFICIENT;
         let drag_force =
@@ -97,15 +93,18 @@ impl Particle {
         let pressure_force = self.calculate_pressure_force(other_particles);
         acceleration += pressure_force / (self.density + 1e-3);
 
+        let viscosity_force = self.calculate_viscosity_force(other_particles);
+        acceleration += viscosity_force;
+
         let cursor_force = self.calculate_cursor_force(cursor);
         acceleration += cursor_force / (self.density + 1e-3);
 
         acceleration
     }
 
-    fn next_position(&self, acceleration: Vector) -> Vector {
-        let final_velocity = self.velocity + acceleration * (constants::DELTATIME as f32);
-        let displacement = final_velocity * (constants::DELTATIME as f32);
+    fn next_position(&self, acceleration: Vector, delta_time: f32) -> Vector {
+        let final_velocity = self.velocity + acceleration * delta_time;
+        let displacement = final_velocity * delta_time;
         let new_position = self.position + displacement;
         return new_position;
     }
@@ -152,11 +151,27 @@ impl Particle {
                 offset / dst
             };
 
-            let slope = smoothing_kernel_derivative(dst, self.get_smoothing_radius());
+            let influence = smoothing_kernel_derivative(dst, self.get_smoothing_radius());
             let pressure = calculate_shared_pressure(self.density, other.density);
-            pressure_force -= dir * pressure * slope;
+            pressure_force -= dir * pressure * influence;
         }
         return pressure_force;
+    }
+
+    pub fn calculate_viscosity_force(&self, other_particles: &Vec<Particle>) -> Vector {
+        let mut viscosity_force: Vector = Vector::zero();
+
+        for other in other_particles {
+            if self == other {
+                continue;
+            }
+
+            let offset = self.position - other.position;
+            let dst = offset.magnitude();
+            let influence = viscosity_smoothing_kernel(dst, self.get_smoothing_radius());
+            viscosity_force += (other.velocity - self.velocity) * influence;
+        }
+        viscosity_force * constants::VISCOSITY_CONSTANT
     }
 
     pub fn calculate_density(&self, point: Vector, other_particles: &Vec<Particle>) -> f32 {

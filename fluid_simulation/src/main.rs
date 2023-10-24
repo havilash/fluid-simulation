@@ -18,6 +18,7 @@ mod game;
 use game::game_context::GameContext;
 
 use crate::game::cursor::{self, Cursor, CursorForceType};
+use crate::game::game_context::GameState;
 
 pub struct Renderer {
     canvas: WindowCanvas,
@@ -56,9 +57,13 @@ impl Renderer {
         self.canvas.set_draw_color(color);
         for dy in (-radius as i32)..=(radius as i32) {
             let dx = (radius.powi(2) - (dy as f64).powi(2)).sqrt() as i32; // dx^2 + dy^2 = radius^2
-            let x1 = x - dx;
-            let x2 = x + dx;
-            self.canvas.draw_line((x1, y + dy), (x2, y + dy)).unwrap();
+            let x1 = x.checked_sub(dx);
+            let x2 = x.checked_add(dx);
+            if let (Some(x1), Some(x2)) = (x1, x2) {
+                if let Some(y_dy) = y.checked_add(dy) {
+                    self.canvas.draw_line((x1, y_dy), (x2, y_dy)).unwrap();
+                }
+            }
         }
     }
 
@@ -116,9 +121,17 @@ pub fn main() -> Result<(), String> {
         CursorForceType::None,
         constants::CURSOR_RADIUS,
     );
+
+    let mut step_frame = false;
+    let mut frame_count = 0;
+    let mut fps_time = Instant::now();
+    let mut fps = constants::FPS as f32;
+    let mut delta_time = 0.0;
     const FRAME_DURATION: Duration = Duration::from_nanos(1_000_000_000 / constants::FPS);
     'running: loop {
         let frame_start = Instant::now();
+        frame_count += 1;
+
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit { .. } => break 'running,
@@ -132,6 +145,7 @@ pub fn main() -> Result<(), String> {
                     (Keycode::R, keymod) if keymod.contains(Mod::LSHIFTMOD) => context.reset(false),
                     (Keycode::R, _) => context.reset(true),
                     (Keycode::H, _) => show_heatmap = true,
+                    (Keycode::Right, _) => step_frame = true,
                     _ => {}
                 },
                 Event::KeyUp {
@@ -160,10 +174,26 @@ pub fn main() -> Result<(), String> {
             }
         }
 
-        context.update(show_heatmap, true, cursor);
+        if context.state == GameState::Playing || step_frame {
+            context.update(show_heatmap, cursor, delta_time);
+            step_frame = false;
+        }
 
         if let Err(e) = renderer.draw(&context, show_heatmap) {
             eprintln!("An error occurred while drawing: {}", e);
+        }
+
+        let elapsed = fps_time.elapsed();
+        if elapsed >= Duration::from_secs(1) {
+            fps = frame_count as f32 / elapsed.as_secs_f32();
+            delta_time = if fps != 0.0 {
+                1.0 / fps.max(constants::FPS as f32)
+            } else {
+                1.0 / constants::FPS as f32
+            };
+
+            frame_count = 0;
+            fps_time = Instant::now();
         }
 
         let frame_time = Instant::now() - frame_start;
