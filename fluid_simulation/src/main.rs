@@ -175,8 +175,12 @@ pub fn main() -> Result<(), String> {
         }
 
         if context.state == GameState::Playing || step_frame {
-            context.update(show_heatmap, cursor, delta_time);
+            context.update(cursor, delta_time);
             step_frame = false;
+        }
+
+        if show_heatmap {
+            context.update_heatmap();
         }
 
         if let Err(e) = renderer.draw(&context, show_heatmap) {

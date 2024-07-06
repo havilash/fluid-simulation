@@ -40,16 +40,18 @@ impl GameContext {
             .ceil()
             .try_into()
             .unwrap();
+        let mut particles_lookup = ParticlesLookup::new(
+            particles,
+            particles_lookup_size,
+            particles_lookup_dimensions,
+        );
+        particles_lookup.update_cells();
 
         GameContext {
             state: GameState::Paused,
             heatmap: vec![vec![0.0; heatmap_height]; heatmap_width],
             heatmap_resolution: heatmap_resolution,
-            particles_lookup: ParticlesLookup::new(
-                particles,
-                particles_lookup_size,
-                particles_lookup_dimensions,
-            ),
+            particles_lookup: particles_lookup,
         }
     }
 
@@ -105,7 +107,7 @@ impl GameContext {
         particles
     }
 
-    pub fn update(&mut self, show_heatmap: bool, cursor: Cursor, delta_time: f32) {
+    pub fn update(&mut self, cursor: Cursor, delta_time: f32) {
         self.particles_lookup.update_cells();
 
         for i in 0..constants::PARTICLE_AMT {
@@ -115,14 +117,9 @@ impl GameContext {
                 current.update(&other_particles, cursor, delta_time);
             }
         }
-
-        if show_heatmap {
-            self.update_heatmap()
-        }
     }
 
     pub fn update_heatmap(&mut self) {
-        let mut density_sum = 0.0;
         for x in 0..self.heatmap.len() {
             for y in 0..self.heatmap[0].len() {
                 let point = Vector::new(x as f32, y as f32) * self.heatmap_resolution as f32;
@@ -134,7 +131,6 @@ impl GameContext {
 
                 let density = calculate_density(point, &other_particles);
                 self.heatmap[x][y] = density;
-                density_sum += density;
             }
         }
     }

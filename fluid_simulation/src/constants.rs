@@ -3,7 +3,7 @@ use sdl2::pixels::Color;
 pub const FPS: u64 = 60;
 pub const WINDOW_SIZE: (u32, u32) = (1200, 900);
 
-pub const GRAVITY: f32 = 128.0;
+pub const GRAVITY: f32 = 150.0;
 pub const COLLISION_DAMPING: f32 = 1.0;
 pub const DRAG_COEFFICIENT: f32 = 0.1;
 
