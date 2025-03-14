@@ -7,7 +7,7 @@ A simple Rust-based fluid dynamics simulation using SDL2 for rendering and input
 ### Prerequisites
 
 - **Rust & Cargo:** [Install Rust](https://www.rust-lang.org/tools/install)
-- **SDL2 (MSVC version):** Follow the instructions on the [rust-sdl2 README](https://github.com/Rust-SDL2/rust-sdl2#sdl20-development-libraries) for installing the SDL2 development libraries on Windows.
+- **SDL2:** Follow the instructions on the [rust-sdl2 README](https://github.com/Rust-SDL2/rust-sdl2#sdl20-development-libraries) for installing the SDL2 development libraries on Windows.
 
 ## Usage
 
